@@ -684,4 +684,142 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/2fa/setup:
+ *   post:
+ *     summary: 2단계 인증 설정
+ *     description: 2단계 인증을 설정합니다
+ *     tags: [Authentication]
+ */
+router.post('/2fa/setup', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { method } = req.body; // sms, email, totp
+    
+    if (!['sms', 'email', 'totp'].includes(method)) {
+      return res.status(400).json(createErrorResponse('지원하지 않는 인증 방법입니다'));
+    }
+    
+    const TwoFactorAuthService = require('../services/twoFactorService').TwoFactorAuthService;
+    const setupData = await TwoFactorAuthService.setupTwoFactor(req.user.id, method);
+    
+    res.json(createSuccessResponse({
+      ...setupData,
+      message: '2단계 인증 설정이 시작되었습니다. 인증 코드를 확인해주세요.'
+    }));
+    
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/2fa/enable:
+ *   post:
+ *     summary: 2단계 인증 활성화
+ *     description: 설정된 2단계 인증을 활성화합니다
+ *     tags: [Authentication]
+ */
+router.post('/2fa/enable', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { verificationCode } = req.body;
+    
+    if (!verificationCode) {
+      return res.status(400).json(createErrorResponse('인증 코드가 필요합니다'));
+    }
+    
+    const TwoFactorAuthService = require('../services/twoFactorService').TwoFactorAuthService;
+    await TwoFactorAuthService.enableTwoFactor(req.user.id, verificationCode);
+    
+    res.json(createSuccessResponse({
+      message: '2단계 인증이 활성화되었습니다'
+    }));
+    
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/2fa/verify:
+ *   post:
+ *     summary: 2단계 인증 확인
+ *     description: 로그인 시 2단계 인증을 수행합니다
+ *     tags: [Authentication]
+ */
+router.post('/2fa/verify', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { userId, code } = req.body;
+    
+    if (!userId || !code) {
+      return res.status(400).json(createErrorResponse('사용자 ID와 인증 코드가 필요합니다'));
+    }
+    
+    const TwoFactorAuthService = require('../services/twoFactorService').TwoFactorAuthService;
+    const ipAddress = getClientIp(req);
+    
+    const isValid = await TwoFactorAuthService.verifyTwoFactor(userId, code, ipAddress);
+    
+    if (isValid) {
+      // 세션 생성
+      req.session.userId = userId;
+      req.session.twoFactorVerified = true;
+      
+      // 사용자 정보 가져오기
+      const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      
+      res.json(createSuccessResponse({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role
+        },
+        message: '2단계 인증이 완료되었습니다'
+      }));
+    }
+    
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/2fa/disable:
+ *   post:
+ *     summary: 2단계 인증 비활성화
+ *     description: 2단계 인증을 비활성화합니다
+ *     tags: [Authentication]
+ */
+router.post('/2fa/disable', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { password } = req.body;
+    
+    if (!password) {
+      return res.status(400).json(createErrorResponse('비밀번호가 필요합니다'));
+    }
+    
+    // 비밀번호 확인
+    const [user] = await db.select().from(users).where(eq(users.id, req.user.id)).limit(1);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json(createErrorResponse('비밀번호가 올바르지 않습니다'));
+    }
+    
+    const TwoFactorAuthService = require('../services/twoFactorService').TwoFactorAuthService;
+    await TwoFactorAuthService.disableTwoFactor(req.user.id, password);
+    
+    res.json(createSuccessResponse({
+      message: '2단계 인증이 비활성화되었습니다'
+    }));
+    
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

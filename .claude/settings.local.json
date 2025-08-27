@@ -10,7 +10,8 @@
       "Bash(npm run dev:*)",
       "Bash(npm cache clean:*)",
       "Bash(yarn --version)",
-      "Bash(yarn install)"
+      "Bash(yarn install)",
+      "Bash(git commit:*)"
     ],
     "additionalDirectories": [
       "C:\\",
