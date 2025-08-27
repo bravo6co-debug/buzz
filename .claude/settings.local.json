@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(git add:*)",
+      "Bash(npm install)",
+      "Bash(pnpm install:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(yarn --version)",
+      "Bash(yarn install)"
+    ],
+    "additionalDirectories": [
+      "C:\\",
+      "C:\\Users\\admin\\Desktop"
+    ]
+  }
+}
