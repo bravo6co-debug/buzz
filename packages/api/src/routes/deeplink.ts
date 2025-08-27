@@ -1,9 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '@buzz/database';
 import { users, referrals, businesses, referralCampaigns } from '@buzz/database/schema';
+import { deeplinkAnalytics } from '@buzz/database/schema/deviceFingerprints';
 import { eq, and, desc } from 'drizzle-orm';
 import { createSuccessResponse, createErrorResponse } from '../schemas/common.js';
 import { DeepLinkBuilder, generateDeepLink, generateUniversalLink } from '../middleware/deeplink.js';
+import { getClientIp } from '../middleware/antifraud.js';
 
 const router = Router();
 
@@ -336,30 +338,76 @@ router.post('/analytics', async (req: Request, res: Response, next: NextFunction
     const { 
       action, 
       referralCode, 
-      campaignId, 
+      campaignId,
+      businessId,
+      templateId,
       platform,
-      userAgent,
-      ipAddress = req.ip,
-      converted = false 
+      eventType = 'click',
+      converted = false,
+      conversionValue,
+      userId,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmTerm,
+      utmContent,
+      referrerUrl,
+      landingPage
     } = req.body;
 
-    // 분석 데이터 저장 로직
-    // TODO: 별도의 analytics 테이블에 저장
+    const ipAddress = getClientIp(req);
+    const userAgent = req.headers['user-agent'] || req.body.userAgent || '';
+    const sessionId = req.sessionID || req.body.sessionId;
+    
+    // User-Agent에서 플랫폼과 디바이스 타입 추출
+    let detectedPlatform = platform;
+    let deviceType = 'desktop';
+    
+    if (!detectedPlatform) {
+      if (/iPhone|iPad|iPod/.test(userAgent)) {
+        detectedPlatform = 'ios';
+        deviceType = /iPad/.test(userAgent) ? 'tablet' : 'mobile';
+      } else if (/Android/.test(userAgent)) {
+        detectedPlatform = 'android';
+        deviceType = /Mobile/.test(userAgent) ? 'mobile' : 'tablet';
+      } else {
+        detectedPlatform = 'web';
+        deviceType = 'desktop';
+      }
+    }
 
-    console.log('DeepLink Analytics:', {
-      action,
-      referralCode,
-      campaignId,
-      platform,
-      userAgent,
-      ipAddress,
-      converted,
-      timestamp: new Date()
-    });
+    // 분석 데이터 저장
+    const [analyticsRecord] = await db.insert(deeplinkAnalytics)
+      .values({
+        action,
+        referralCode,
+        campaignId: campaignId ? parseInt(campaignId) : null,
+        businessId: businessId ? parseInt(businessId) : null,
+        templateId: templateId ? parseInt(templateId) : null,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+        utmTerm,
+        utmContent,
+        ipAddress,
+        userAgent,
+        platform: detectedPlatform,
+        deviceType,
+        eventType,
+        converted,
+        convertedAt: converted ? new Date() : null,
+        conversionValue: conversionValue ? parseInt(conversionValue) : null,
+        userId: userId ? parseInt(userId) : null,
+        sessionId,
+        referrerUrl,
+        landingPage,
+      })
+      .returning();
 
     res.json(createSuccessResponse({
       message: '분석 데이터가 수집되었습니다',
-      trackingId: `analytics_${Date.now()}`
+      trackingId: `analytics_${analyticsRecord.id}`,
+      analyticsId: analyticsRecord.id,
     }));
 
   } catch (error) {

@@ -3,13 +3,22 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '@buzz/database';
 import { users, referrals, mileageTransactions, businesses, systemSettings, events } from '@buzz/database/schema';
+import { deviceFingerprints, signupAttempts } from '@buzz/database/schema/deviceFingerprints';
 import { eq, and, sql, lte, gte } from 'drizzle-orm';
 import { validateBody } from '../middleware/validation.js';
 import { signupSchema, loginSchema, businessSignupSchema } from '../schemas/auth.js';
 import { createSuccessResponse, createErrorResponse } from '../schemas/common.js';
 import { notifyReferralConversion } from './notifications.js';
+import { antifraudMiddleware, createRateLimiter, getClientIp } from '../middleware/antifraud.js';
 
 const router = Router();
+
+// Rate limiting: 5 가입 시도/15분
+const signupRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: '너무 많은 가입 시도가 감지되었습니다. 15분 후 다시 시도해주세요.',
+});
 
 /**
  * @swagger
@@ -35,9 +44,29 @@ const router = Router();
  *       409:
  *         description: 이미 존재하는 이메일
  */
-router.post('/signup', validateBody(signupSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/signup', signupRateLimiter, antifraudMiddleware, validateBody(signupSchema), async (req: Request, res: Response, next: NextFunction) => {
+  let attemptLog: any = null;
   try {
     const { email, password, name, phone, referralCode } = req.body;
+    const clientIp = getClientIp(req);
+    const sessionId = req.sessionID || 'unknown';
+    
+    // 가입 시도 로깅 (시작)
+    [attemptLog] = await db.insert(signupAttempts)
+      .values({
+        email,
+        phone,
+        ipAddress: clientIp,
+        fingerprintId: req.fingerprintId,
+        status: 'pending',
+        referralCode,
+        userAgent: req.headers['user-agent'] || '',
+        headers: JSON.stringify(req.headers),
+        sessionId,
+        riskScore: req.antifraud?.riskScore || 0,
+        riskFactors: req.antifraud ? JSON.stringify(req.antifraud) : null,
+      })
+      .returning();
 
     // Check if user already exists
     const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
@@ -357,9 +386,39 @@ router.post('/signup', validateBody(signupSchema), async (req: Request, res: Res
       message += ` with event bonuses applied`;
     }
 
+    // 가입 시도 로깅 (성공)
+    await db.update(signupAttempts)
+      .set({
+        status: 'success',
+        completedAt: new Date(),
+        referrerId: result.referrerId,
+      })
+      .where(eq(signupAttempts.id, attemptLog.id));
+    
+    // 디바이스 핑거프린트 성공 카운트 업데이트
+    if (req.fingerprintId) {
+      await db.update(deviceFingerprints)
+        .set({
+          successfulSignups: sql`successful_signups + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(deviceFingerprints.id, req.fingerprintId));
+    }
+    
     res.status(201).json(createSuccessResponse(responseData, message));
 
   } catch (error) {
+    // 가입 시도 로깅 (실패)
+    if (attemptLog) {
+      await db.update(signupAttempts)
+        .set({
+          status: 'failed',
+          blockedReason: error.message || 'unknown_error',
+          completedAt: new Date(),
+        })
+        .where(eq(signupAttempts.id, attemptLog.id));
+    }
+    
     next(error);
   }
 });

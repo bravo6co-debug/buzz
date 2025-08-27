@@ -10,3 +10,4 @@ export * from './systemSettings';
 export * from './regionalContents';
 export * from './events';
 export * from './qrTokens';
+export * from './deviceFingerprints';
