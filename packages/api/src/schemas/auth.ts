@@ -41,9 +41,24 @@ import { emailSchema, passwordSchema, phoneSchema } from './common.js';
 export const signupSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
-  name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name cannot exceed 100 characters'),
+  name: z.string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name cannot exceed 100 characters')
+    .regex(/^[가-힣a-zA-Z\s]+$/, 'Name can only contain Korean, English letters and spaces')
+    .trim(),
   phone: phoneSchema.optional(),
-  referralCode: z.string().optional()
+  referralCode: z.string()
+    .min(4, 'Invalid referral code')
+    .max(20, 'Invalid referral code')
+    .regex(/^[A-Z0-9]+$/, 'Invalid referral code format')
+    .optional(),
+  // Anti-fraud fields
+  fingerprint: z.string().optional(),
+  deviceInfo: z.object({
+    userAgent: z.string().optional(),
+    screenResolution: z.string().optional(),
+    timezone: z.string().optional(),
+  }).optional(),
 });
 
 /**

@@ -86,10 +86,10 @@ pnpm dev
 ```
 
 This will start:
-- API server at http://localhost:3001
-- Customer app at http://localhost:3000
-- Business dashboard at http://localhost:3002
-- Admin dashboard at http://localhost:3003
+- API server at http://localhost:8083
+- Customer app at http://localhost:8010
+- Business dashboard at http://localhost:8012
+- Admin dashboard at http://localhost:8013
 
 ### Individual Commands
 
@@ -134,8 +134,8 @@ pnpm build --filter=@buzz/api     # Build API only
 ## API Documentation
 
 When running the API server, documentation is available at:
-- Swagger UI: http://localhost:3001/docs
-- Health Check: http://localhost:3001/health
+- Swagger UI: http://localhost:8083/docs
+- Health Check: http://localhost:8083/health
 
 ## Applications
 

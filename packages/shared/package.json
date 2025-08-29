@@ -1,36 +1,44 @@
 {
   "name": "@buzz/shared",
   "version": "1.0.0",
-  "description": "Buzz platform shared types and utilities",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "Shared utilities and types for Buzz Platform",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./logger": {
+      "import": "./dist/logger/index.js",
+      "require": "./dist/logger/index.js"
+    },
+    "./types": {
+      "import": "./dist/types/index.js",
+      "require": "./dist/types/index.js"
+    },
+    "./utils": {
+      "import": "./dist/utils/index.js",
+      "require": "./dist/utils/index.js"
+    },
+    "./api": {
+      "import": "./dist/api/index.js",
+      "require": "./dist/api/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rimraf dist",
-    "lint": "eslint src --ext .ts",
-    "type-check": "tsc --noEmit"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
-    "zod": "^3.22.4"
+    "axios": "^1.6.2",
+    "winston": "^3.17.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node": "^20.10.5",
-    "rimraf": "^5.0.5",
-    "typescript": "^5.3.3"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./types": {
-      "types": "./dist/types.d.ts",
-      "default": "./dist/types.js"
-    },
-    "./utils": {
-      "types": "./dist/utils.d.ts",
-      "default": "./dist/utils.js"
-    }
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2"
   }
 }

@@ -72,10 +72,12 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3002,
+    port: 8012, // PORTS.BUZZ_BIZ 고정
+    strictPort: true, // 포트가 사용 중이면 에러 발생 (포트 변경 금지)
+    host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:8083',
         changeOrigin: true,
       },
     },

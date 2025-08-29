@@ -502,7 +502,10 @@ export class BackupService {
   private executePgDump(outputPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
       // 환경 변수에서 DB 정보 가져오기 (실제로는 더 안전한 방식 필요)
-      const dbUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/buzz';
+      const dbUrl = process.env.DATABASE_URL;
+      if (!dbUrl) {
+        return reject(new Error('DATABASE_URL environment variable is required for backup'));
+      }
       
       const pgDump = spawn('pg_dump', [dbUrl, '--no-owner', '--no-privileges'], {
         stdio: ['ignore', 'pipe', 'pipe']
@@ -535,7 +538,10 @@ export class BackupService {
   // PostgreSQL 복원 실행
   private executePsqlRestore(inputPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      const dbUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/buzz';
+      const dbUrl = process.env.DATABASE_URL;
+      if (!dbUrl) {
+        return reject(new Error('DATABASE_URL environment variable is required for backup'));
+      }
       
       const psql = spawn('psql', [dbUrl], {
         stdio: ['pipe', 'pipe', 'pipe']

@@ -28,7 +28,7 @@ const ANTIFRAUD_CONFIG = {
 };
 
 // IP 주소 추출 (프록시 고려)
-function getClientIp(req: Request): string {
+export function getClientIp(req: Request): string {
   const forwarded = req.headers['x-forwarded-for'] as string;
   const ip = forwarded ? forwarded.split(',')[0].trim() : req.ip || req.socket.remoteAddress || '';
   

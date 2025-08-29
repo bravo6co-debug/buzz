@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { GamificationPanel } from '../components/GamificationPanel';
 import { PerformanceDashboard } from '../components/PerformanceDashboard';
 import { TemplateStudio } from '../components/TemplateStudio';
@@ -132,7 +132,7 @@ interface Stats {
 }
 
 export function ReferralHub() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [stats, setStats] = useState<Stats>({
     totalReferrals: 0,
@@ -179,7 +179,7 @@ export function ReferralHub() {
   };
 
   const handleCreateCampaign = () => {
-    navigate('/referrals/campaign/new');
+    setLocation('/referrals/campaign/new');
   };
 
   const formatCurrency = (amount: number) => {
@@ -250,7 +250,7 @@ export function ReferralHub() {
     <Container>
       <Header>
         <div>
-          <Title>🚀 마케터 허브</Title>
+          <Title>🚀 리퍼럴 마케터 허브</Title>
           <Subtitle>나만의 바이럴 마케팅을 시작하세요</Subtitle>
         </div>
       </Header>

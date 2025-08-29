@@ -13,19 +13,24 @@ import { MyPage } from './pages/MyPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { ReferralHub } from './pages/ReferralHub';
+import { MarketerPage } from './pages/MarketerPage';
 import { BusinessModal } from './components/BusinessModal';
 import { QRModal } from './components/QRModal';
+import { CouponModal } from './components/CouponModal';
+import { useCouponModal } from './hooks/use-coupon-modal';
 import { Toaster } from './components/ui/toaster';
 import './globals.css';
 
 function App() {
+  const { isOpen: isCouponModalOpen, closeCouponModal } = useCouponModal();
+  
   useEffect(() => {
     // 푸시 알림 초기화
     initializePushNotifications().then((success) => {
       if (success) {
-        console.log('Push notifications initialized successfully');
+        console.debug('Push notifications initialized successfully');
       } else {
-        console.log('Failed to initialize push notifications');
+        console.warn('Failed to initialize push notifications');
       }
     });
 
@@ -65,6 +70,9 @@ function App() {
                   <Route path="/referrals">
                     <ReferralHub />
                   </Route>
+                  <Route path="/marketer">
+                    <MarketerPage />
+                  </Route>
                   
                   {/* Catch all - redirect to home */}
                   <Route>
@@ -78,6 +86,7 @@ function App() {
           {/* Global modals */}
           <BusinessModal />
           <QRModal />
+          <CouponModal isOpen={isCouponModalOpen} onClose={closeCouponModal} />
           
           {/* Toast notifications */}
           <Toaster />

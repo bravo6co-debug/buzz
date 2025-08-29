@@ -11,6 +11,7 @@ import {
 } from '@buzz/database/schema';
 import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
 import { notifySettlementCompleted, notifySettlementFailed } from '../routes/notifications.js';
+import { log } from '@buzz/shared/logger';
 
 export interface SettlementCalculation {
   businessId: number;
@@ -31,7 +32,7 @@ export class SettlementBatchService {
     const batchLog = await this.createBatchLog('daily');
     
     try {
-      console.log('🔄 Starting daily settlement batch...');
+      log.info('🔄 Starting daily settlement batch...');
       
       // 어제 거래 데이터 기준으로 정산
       const yesterday = new Date();
@@ -67,7 +68,7 @@ export class SettlementBatchService {
         } catch (error) {
           failedCount++;
           errors.push(`Business ${settlement.businessId}: ${error.message}`);
-          console.error(`Failed to process settlement for business ${settlement.businessId}:`, error);
+          log.error(`Failed to process settlement for business ${settlement.businessId}`, error);
         }
       }
       
@@ -82,7 +83,7 @@ export class SettlementBatchService {
         executionTime
       });
       
-      console.log(`✅ Daily settlement completed: ${processedCount} processed, ${failedCount} failed, Total: ₩${totalAmount.toLocaleString()}`);
+      log.info(`✅ Daily settlement completed: ${processedCount} processed, ${failedCount} failed, Total: ₩${totalAmount.toLocaleString()}`);
       
     } catch (error) {
       const executionTime = Math.round((Date.now() - startTime) / 1000);
@@ -93,7 +94,7 @@ export class SettlementBatchService {
         executionTime
       });
       
-      console.error('❌ Daily settlement batch failed:', error);
+      log.error('❌ Daily settlement batch failed', error);
       throw error;
     }
   }
@@ -104,7 +105,7 @@ export class SettlementBatchService {
     const batchLog = await this.createBatchLog('weekly');
     
     try {
-      console.log('🔄 Starting weekly settlement batch...');
+      log.info('🔄 Starting weekly settlement batch...');
       
       // 지난주 데이터 기준
       const lastWeekStart = new Date();
@@ -142,10 +143,10 @@ export class SettlementBatchService {
         executionTime
       });
       
-      console.log(`✅ Weekly settlement completed: ${processedCount} processed, Total: ₩${totalAmount.toLocaleString()}`);
+      log.info(`✅ Weekly settlement completed: ${processedCount} processed, Total: ₩${totalAmount.toLocaleString()}`);
       
     } catch (error) {
-      console.error('❌ Weekly settlement batch failed:', error);
+      log.error('❌ Weekly settlement batch failed', error);
       throw error;
     }
   }
@@ -156,7 +157,7 @@ export class SettlementBatchService {
     const batchLog = await this.createBatchLog('monthly');
     
     try {
-      console.log('🔄 Starting monthly settlement batch...');
+      log.info('🔄 Starting monthly settlement batch...');
       
       // 지난달 데이터 기준
       const lastMonth = new Date();
@@ -196,10 +197,10 @@ export class SettlementBatchService {
         executionTime
       });
       
-      console.log(`✅ Monthly settlement completed: ${processedCount} processed, Total: ₩${totalAmount.toLocaleString()}`);
+      log.info(`✅ Monthly settlement completed: ${processedCount} processed, Total: ₩${totalAmount.toLocaleString()}`);
       
     } catch (error) {
-      console.error('❌ Monthly settlement batch failed:', error);
+      log.error('❌ Monthly settlement batch failed', error);
       throw error;
     }
   }
@@ -353,7 +354,7 @@ export class SettlementBatchService {
       approvedAt: shouldAutoApprove ? new Date() : null
     });
     
-    console.log(`Settlement created for business ${data.businessId}: ₩${data.netAmount.toLocaleString()} (${shouldAutoApprove ? 'auto-approved' : 'pending review'})`);
+    log.info(`Settlement created for business ${data.businessId}: ₩${data.netAmount.toLocaleString()} (${shouldAutoApprove ? 'auto-approved' : 'pending review'})`);
   }
   
   // 배치 로그 생성
@@ -413,11 +414,11 @@ export class SettlementBatchService {
             isAutomatic: true
           });
           
-          console.log(`Real-time settlement created for business ${businessId}: ₩${calculation.netAmount.toLocaleString()}`);
+          log.info(`Real-time settlement created for business ${businessId}: ₩${calculation.netAmount.toLocaleString()}`);
         }
       }
     } catch (error) {
-      console.error('Failed to process real-time settlement:', error);
+      log.error('Failed to process real-time settlement', error);
     }
   }
 }

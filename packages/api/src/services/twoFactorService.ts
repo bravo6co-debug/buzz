@@ -19,14 +19,27 @@ const TWO_FACTOR_CONFIG = {
   backupCodeLength: 8,
 };
 
-// 이메일 전송 설정
-const emailTransporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// 이메일 전송 설정 - 환경변수 검증
+const createEmailTransporter = () => {
+  const emailService = process.env.EMAIL_SERVICE;
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
+
+  if (!emailService || !emailUser || !emailPass) {
+    console.warn('Email configuration missing. EMAIL_SERVICE, EMAIL_USER, and EMAIL_PASS environment variables are required for 2FA email functionality.');
+    return null;
+  }
+
+  return nodemailer.createTransporter({
+    service: emailService,
+    auth: {
+      user: emailUser,
+      pass: emailPass,
+    },
+  });
+};
+
+const emailTransporter = createEmailTransporter();
 
 // SMS 전송 설정 (Twilio)
 const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
@@ -349,8 +362,17 @@ export class TwoFactorAuthService {
    */
   private static async sendVerificationCode(user: any, method: 'sms' | 'email', code: string): Promise<void> {
     if (method === 'email') {
+      if (!emailTransporter) {
+        throw new Error('Email transporter not configured. Please set EMAIL_SERVICE, EMAIL_USER, and EMAIL_PASS environment variables.');
+      }
+      
+      const emailFrom = process.env.EMAIL_FROM;
+      if (!emailFrom) {
+        throw new Error('EMAIL_FROM environment variable is required for sending emails.');
+      }
+      
       await emailTransporter.sendMail({
-        from: process.env.EMAIL_FROM || 'noreply@buzz.com',
+        from: emailFrom,
         to: user.email,
         subject: 'Buzz 2단계 인증 코드',
         html: `

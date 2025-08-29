@@ -1,4 +1,4 @@
-import { Home, MapPin, Calendar, User, Rocket } from 'lucide-react';
+import { Home, MapPin, Calendar, User, Rocket, TrendingUp } from 'lucide-react';
 import { useLocation } from 'wouter';
 import { cn } from '../lib/utils';
 
@@ -16,10 +16,10 @@ const navItems = [
     icon: MapPin,
   },
   {
-    key: 'referrals',
+    key: 'marketer',
     label: '마케터',
-    href: '/referrals',
-    icon: Rocket,
+    href: '/marketer',
+    icon: TrendingUp,
   },
   {
     key: 'events',

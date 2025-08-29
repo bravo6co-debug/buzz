@@ -1,0 +1,177 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: buzz-postgres
+    environment:
+      POSTGRES_DB: buzz_db
+      POSTGRES_USER: ${DB_USER:-buzz_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-buzz_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - buzz-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-buzz_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: buzz-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - buzz-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Main customer app
+  buzz:
+    build:
+      context: .
+      dockerfile: apps/buzz/Dockerfile
+      args:
+        BUILD_ENV: production
+    container_name: buzz-app
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - buzz-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Admin dashboard
+  buzz-admin:
+    build:
+      context: .
+      dockerfile: apps/buzz-admin/Dockerfile
+      args:
+        BUILD_ENV: production
+    container_name: buzz-admin
+    ports:
+      - "8081:80"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+      - redis
+      - api
+    networks:
+      - buzz-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Business app
+  buzz-biz:
+    build:
+      context: .
+      dockerfile: apps/buzz-biz/Dockerfile
+      args:
+        BUILD_ENV: production
+    container_name: buzz-biz
+    ports:
+      - "8082:80"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+      - redis
+      - api
+    networks:
+      - buzz-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # API Backend Server
+  api:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    container_name: buzz-api
+    ports:
+      - "8083:8083"
+    environment:
+      - NODE_ENV=production
+      - PORT=8083
+      - HOST=0.0.0.0
+      - SESSION_SECRET=${SESSION_SECRET:-your-super-secret-session-key-at-least-32-chars-long}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-buzz_db}
+      - DB_USER=${DB_USER:-buzz_user}
+      - DB_PASSWORD=${DB_PASSWORD:-buzz_password}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - buzz-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: buzz-nginx
+    volumes:
+      - ./nginx-main.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - buzz
+      - buzz-biz
+      - buzz-admin
+      - api
+    networks:
+      - buzz-network
+    restart: unless-stopped
+
+networks:
+  buzz-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  node_modules_cache:

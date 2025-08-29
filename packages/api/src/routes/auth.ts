@@ -10,6 +10,7 @@ import { signupSchema, loginSchema, businessSignupSchema } from '../schemas/auth
 import { createSuccessResponse, createErrorResponse } from '../schemas/common.js';
 import { notifyReferralConversion } from './notifications.js';
 import { antifraudMiddleware, createRateLimiter, getClientIp } from '../middleware/antifraud.js';
+import { log } from '@buzz/shared/logger';
 
 const router = Router();
 
@@ -18,6 +19,13 @@ const signupRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 5,
   message: '너무 많은 가입 시도가 감지되었습니다. 15분 후 다시 시도해주세요.',
+});
+
+// Rate limiting for login: 10 로그인 시도/15분
+const loginRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: '너무 많은 로그인 시도가 감지되었습니다. 15분 후 다시 시도해주세요.',
 });
 
 /**
@@ -247,7 +255,9 @@ router.post('/signup', signupRateLimiter, antifraudMiddleware, validateBody(sign
             .where(eq(users.id, referrerId));
 
           // 리퍼럴 전환 알림 전송 (비동기)
-          notifyReferralConversion(referrerId, newUser.id).catch(console.error);
+          notifyReferralConversion(referrerId, newUser.id).catch(error => 
+            log.error('Failed to notify referral conversion', error)
+          );
 
           // Create referrer mileage transaction
           let referrerDescription = `리퍼럴 추천 보상 - ${name}님 가입`;
@@ -548,7 +558,7 @@ router.post('/business/signup', validateBody(businessSignupSchema), async (req: 
  *       401:
  *         description: 이메일 또는 비밀번호가 틀림
  */
-router.post('/login', validateBody(loginSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', loginRateLimiter, antifraudMiddleware, validateBody(loginSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
 
@@ -692,7 +702,7 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
  *     description: 2단계 인증을 설정합니다
  *     tags: [Authentication]
  */
-router.post('/2fa/setup', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/2fa/setup', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { method } = req.body; // sms, email, totp
     
@@ -721,7 +731,7 @@ router.post('/2fa/setup', authenticateToken, async (req: Request, res: Response,
  *     description: 설정된 2단계 인증을 활성화합니다
  *     tags: [Authentication]
  */
-router.post('/2fa/enable', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/2fa/enable', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { verificationCode } = req.body;
     
@@ -794,7 +804,7 @@ router.post('/2fa/verify', async (req: Request, res: Response, next: NextFunctio
  *     description: 2단계 인증을 비활성화합니다
  *     tags: [Authentication]
  */
-router.post('/2fa/disable', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/2fa/disable', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { password } = req.body;
     

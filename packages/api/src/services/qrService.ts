@@ -4,7 +4,16 @@ import { db } from '@buzz/database';
 import { qrTokens, qrUsageLogs } from '@buzz/database/schema';
 import { eq, and, gte } from 'drizzle-orm';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'buzz-qr-secret-key';
+const JWT_SECRET = (() => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required but not set');
+  }
+  if (secret.length < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters long');
+  }
+  return secret;
+})();
 const QR_TOKEN_EXPIRY_MINUTES = 10; // 10 minutes expiry
 
 export interface QRTokenPayload {

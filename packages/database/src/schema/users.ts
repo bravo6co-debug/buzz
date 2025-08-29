@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   email: varchar('email', { length: 255 }).unique().notNull(),
+  password: varchar('password', { length: 255 }).notNull(), // bcrypt 해시된 비밀번호
   name: varchar('name', { length: 100 }).notNull(),
   phone: varchar('phone', { length: 20 }).unique(),
   role: varchar('role', { length: 20 }).default('user').notNull(), // user, business, admin

@@ -1,0 +1,29 @@
+services:
+  buzz-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "8090:8010"  # buzz app  
+      - "8091:8013"  # buzz-admin app
+      - "8092:8012"  # buzz-biz app
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_HMR_PORT=24678
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/apps/buzz/node_modules
+      - /app/apps/buzz-admin/node_modules
+      - /app/apps/buzz-biz/node_modules
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    networks:
+      - buzz-network
+
+networks:
+  buzz-network:
+    driver: bridge

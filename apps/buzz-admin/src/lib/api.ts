@@ -201,3 +201,5 @@ export const authApi = {
   getCurrentUser: (): Promise<ApiResponse<User>> =>
     api.get('/auth/me').then(res => res.data),
 };
+
+export { api };

@@ -10,7 +10,17 @@ declare global {
   var __db__: ReturnType<typeof drizzle> | undefined;
 }
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://localhost:5432/buzz_platform';
+const connectionString = (() => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL environment variable is required but not set');
+  }
+  // Basic validation - ensure it starts with postgresql://
+  if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL connection string');
+  }
+  return dbUrl;
+})();
 
 // Create postgres client
 const sql = postgres(connectionString, { 

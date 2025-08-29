@@ -123,9 +123,9 @@ DATABASE_URL=postgresql://user:password@localhost:5432/buzz_platform
 SESSION_SECRET=your-super-secret-session-key
 
 # URLs
-API_BASE_URL=http://localhost:3001
+API_BASE_URL=http://localhost:8083
 FRONTEND_URL=https://buzz.namgu.kr
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:8010,http://localhost:8012,http://localhost:8013
 ```
 
 ### 3. 데이터베이스 설정
@@ -156,7 +156,7 @@ pnpm run start
 
 서버 실행 후 다음 URL에서 Swagger 문서를 확인할 수 있습니다:
 
-- 개발: http://localhost:3001/docs
+- 개발: http://localhost:8083/docs
 - 프로덕션: {API_BASE_URL}/docs
 
 ## 보안 기능

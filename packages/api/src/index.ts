@@ -8,7 +8,9 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import csrf from 'csurf';
 import { db } from '@buzz/database';
+import { log } from '@buzz/shared/logger';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -63,10 +65,12 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175'
+    'http://localhost:8010',
+    'http://localhost:8012',
+    'http://localhost:8013',
+    'http://localhost:8080',
+    'http://localhost:8081',
+    'http://localhost:8082'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -77,20 +81,66 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Session configuration
+// Validate critical environment variables
+const validateEnvironment = () => {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error('SESSION_SECRET environment variable is required but not set');
+  }
+  if (sessionSecret.length < 32) {
+    throw new Error('SESSION_SECRET must be at least 32 characters long');
+  }
+  return sessionSecret;
+};
+
+const SESSION_SECRET = validateEnvironment();
+
+// Session configuration with enhanced security
 app.use(session({
   store: sessionStore,
-  secret: process.env.SESSION_SECRET || 'your-super-secret-session-key',
+  secret: SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  rolling: true, // Reset expiration on activity
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
   },
-  name: 'buzz.sid'
+  name: 'buzz.sid',
+  // Generate new session ID on login to prevent session fixation
+  genid: () => {
+    return require('crypto').randomBytes(32).toString('hex');
+  }
 }));
+
+// CSRF Protection - only for non-GET requests
+const csrfProtection = csrf({
+  cookie: {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
+  }
+});
+
+// Apply CSRF protection to all routes except GET requests and API documentation
+app.use('/api', (req, res, next) => {
+  // Skip CSRF for GET requests and safe methods
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return next();
+  }
+  // Skip CSRF for webhook endpoints that need to accept external requests
+  if (req.path.startsWith('/webhooks/')) {
+    return next();
+  }
+  csrfProtection(req, res, next);
+});
+
+// Provide CSRF token endpoint
+app.get('/api/csrf-token', csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 // Swagger configuration
 const swaggerOptions = {
@@ -106,7 +156,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: process.env.API_BASE_URL || 'http://localhost:3001',
+        url: process.env.API_BASE_URL || 'http://localhost:8083',
         description: 'Development server'
       }
     ],
@@ -168,29 +218,29 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Start server
-const PORT = parseInt(process.env.PORT || '3001');
+const PORT = parseInt(process.env.PORT || '8083');
 const HOST = process.env.HOST || '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
-  console.log(`🚀 Buzz API Server running on http://${HOST}:${PORT}`);
-  console.log(`📚 API Documentation available at http://${HOST}:${PORT}/docs`);
-  console.log(`🏥 Health check available at http://${HOST}:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  log.info(`🚀 Buzz API Server running on http://${HOST}:${PORT}`);
+  log.info(`📚 API Documentation available at http://${HOST}:${PORT}/docs`);
+  log.info(`🏥 Health check available at http://${HOST}:${PORT}/health`);
+  log.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+  log.info('SIGTERM received. Shutting down gracefully...');
   sessionStore.close?.(() => {
-    console.log('Session store closed.');
+    log.info('Session store closed.');
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully...');
+  log.info('SIGINT received. Shutting down gracefully...');
   sessionStore.close?.(() => {
-    console.log('Session store closed.');
+    log.info('Session store closed.');
     process.exit(0);
   });
 });

@@ -1,0 +1,116 @@
+name: Validate Port Configuration
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  validate-ports:
+    name: Port Validation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Check for forbidden 3000-3999 ports
+        run: |
+          echo "🔍 Checking for forbidden 3000-3999 ports..."
+          
+          # JavaScript/TypeScript 파일에서 3000번대 포트 검색
+          if grep -r "port.*[[:space:]]*[:=][[:space:]]*3[0-9][0-9][0-9]" \
+            --include="*.ts" \
+            --include="*.tsx" \
+            --include="*.js" \
+            --include="*.jsx" \
+            --include="*.json" \
+            --exclude-dir=node_modules \
+            --exclude-dir=dist \
+            --exclude-dir=build \
+            --exclude-dir=.next \
+            --exclude-dir=coverage \
+            --exclude=validate-ports.js \
+            --exclude=ports.config.ts; then
+            echo "❌ ERROR: Found forbidden 3000-3999 ports in source code!"
+            echo "📝 Policy: All services must use ports in range 8000-8999"
+            exit 1
+          fi
+          
+          # YAML/YML 파일에서 3000번대 포트 검색
+          if grep -r "port.*:[[:space:]]*3[0-9][0-9][0-9]" \
+            --include="*.yml" \
+            --include="*.yaml" \
+            --exclude-dir=node_modules \
+            --exclude-dir=.github; then
+            echo "❌ ERROR: Found forbidden 3000-3999 ports in YAML files!"
+            echo "📝 Policy: All services must use ports in range 8000-8999"
+            exit 1
+          fi
+          
+          echo "✅ No forbidden 3000-3999 ports found"
+      
+      - name: Check for forbidden 9004 port
+        run: |
+          echo "🔍 Checking for forbidden 9004 port..."
+          
+          if grep -r "port.*[[:space:]]*[:=][[:space:]]*9004" \
+            --include="*.ts" \
+            --include="*.tsx" \
+            --include="*.js" \
+            --include="*.jsx" \
+            --include="*.json" \
+            --include="*.yml" \
+            --include="*.yaml" \
+            --exclude-dir=node_modules \
+            --exclude-dir=dist \
+            --exclude-dir=build \
+            --exclude-dir=.next \
+            --exclude-dir=coverage \
+            --exclude=validate-ports.js \
+            --exclude=ports.config.ts; then
+            echo "❌ ERROR: Found forbidden 9004 port in source code!"
+            echo "📝 Policy: Port 9004 is strictly forbidden"
+            exit 1
+          fi
+          
+          echo "✅ No forbidden 9004 port found"
+      
+      - name: Verify port configuration file exists
+        run: |
+          echo "🔍 Checking port configuration file..."
+          
+          if [ -f "packages/shared/config/ports.config.ts" ]; then
+            echo "✅ Port configuration file exists"
+          else
+            echo "⚠️ Warning: Port configuration file not found at packages/shared/config/ports.config.ts"
+            echo "   Consider using centralized port management"
+          fi
+      
+      - name: Run port validation script
+        run: |
+          echo "🔍 Running port validation script..."
+          
+          if [ -f "scripts/validate-ports.js" ]; then
+            node scripts/validate-ports.js
+          else
+            echo "⚠️ Warning: Port validation script not found at scripts/validate-ports.js"
+          fi
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "📋 Port Policy Summary:"
+          echo "  ✅ Allowed: 8000-8999 (All services)"
+          echo "  ✅ Allowed: 80, 443 (Web servers)"
+          echo "  ✅ Allowed: 5432, 6379 (Database/Cache)"
+          echo "  ❌ Forbidden: 3000-3999"
+          echo "  ❌ Forbidden: 9004"
+          echo "========================================"

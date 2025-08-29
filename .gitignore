@@ -6,6 +6,8 @@ node_modules/
 # Testing
 /coverage
 *.lcov
+playwright-report/
+test-results/
 
 # Production builds
 /build
@@ -75,9 +77,13 @@ typings/
 .env
 .env.test
 .env.local
+.env.development
+.env.staging
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local
+.env*.local
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -146,6 +152,14 @@ lerna-debug.log*
 
 # Turbo
 .turbo/
+
+# Vite
+vite.config.ts.timestamp-*
+dev-dist/
+
+# Firebase
+.firebase/
+firebase-debug.log
 
 # Database
 *.sqlite

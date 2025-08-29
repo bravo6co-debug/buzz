@@ -1,0 +1,43 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "email": "user@buzz.com",
+      "password": "$2a$10$mKzxGkZ8vCvDYkJLNx5Y0e5w8eQPjWQ8rGN6dD7vXMRk0HXMH/VGa",
+      "name": "일반 사용자",
+      "phone": "010-1234-5678",
+      "role": "user",
+      "mileageBalance": 5000,
+      "referralCode": "USER1234",
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "email": "business@buzz.com",
+      "password": "$2a$10$mKzxGkZ8vCvDYkJLNx5Y0e5w8eQPjWQ8rGN6dD7vXMRk0HXMH/VGa",
+      "name": "사업자",
+      "phone": "010-8765-4321",
+      "role": "business",
+      "mileageBalance": 0,
+      "referralCode": "BIZ12345",
+      "isActive": true,
+      "businessName": "버즈 카페",
+      "businessAddress": "서울시 강남구 테헤란로 123",
+      "businessPhone": "02-1234-5678",
+      "category": "cafe",
+      "isApproved": true
+    },
+    {
+      "id": 3,
+      "email": "admin@buzz.com",
+      "password": "$2a$10$mKzxGkZ8vCvDYkJLNx5Y0e5w8eQPjWQ8rGN6dD7vXMRk0HXMH/VGa",
+      "name": "관리자",
+      "phone": "010-0000-0000",
+      "role": "admin",
+      "mileageBalance": 0,
+      "referralCode": "ADMIN999",
+      "isActive": true
+    }
+  ],
+  "plainPassword": "Password123!"
+}

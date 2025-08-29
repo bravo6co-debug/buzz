@@ -2,22 +2,38 @@
 
 import { initializeApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { logger } from '../../../../packages/shared/utils/logger';
 
-// Firebase 설정 (환경변수에서 가져오기)
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+// Firebase 설정 (환경변수 검증 포함)
+const validateFirebaseConfig = () => {
+  const requiredVars = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  };
+
+  const missingVars = Object.entries(requiredVars)
+    .filter(([_, value]) => !value)
+    .map(([key]) => `VITE_FIREBASE_${key.toUpperCase().replace(/([A-Z])/g, '_$1')}`);
+
+  if (missingVars.length > 0) {
+    logger.error(`Missing Firebase configuration variables: ${missingVars.join(', ')}`);
+    return null;
+  }
+
+  return requiredVars;
 };
 
+const firebaseConfig = validateFirebaseConfig();
+
 // Firebase 앱 초기화
-const app = initializeApp(firebaseConfig);
+const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
 
 // 메시징 인스턴스
-export const messaging = getMessaging(app);
+export const messaging = app ? getMessaging(app) : null;
 
 // VAPID 키 (환경변수에서 가져오기)
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
@@ -25,6 +41,11 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 // FCM 토큰 가져오기
 export async function getFCMToken(): Promise<string | null> {
   try {
+    if (!messaging) {
+      logger.warn('Firebase messaging not initialized. Check Firebase configuration.');
+      return null;
+    }
+    
     // 서비스 워커 등록 확인
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
@@ -35,17 +56,17 @@ export async function getFCMToken(): Promise<string | null> {
       });
       
       if (token) {
-        console.log('FCM Token:', token);
+        logger.debug('FCM Token:', token);
         return token;
       } else {
-        console.log('No registration token available.');
+        logger.info('No registration token available.');
         return null;
       }
     }
     
     return null;
   } catch (error) {
-    console.error('An error occurred while retrieving token:', error);
+    logger.error('An error occurred while retrieving token:', error);
     return null;
   }
 }
@@ -56,7 +77,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
     const permission = await Notification.requestPermission();
     
     if (permission === 'granted') {
-      console.log('Notification permission granted.');
+      logger.info('Notification permission granted.');
       
       // FCM 토큰 가져오기
       const token = await getFCMToken();
@@ -67,12 +88,12 @@ export async function requestNotificationPermission(): Promise<boolean> {
         return true;
       }
     } else {
-      console.log('Unable to get permission to notify.');
+      logger.info('Unable to get permission to notify.');
     }
     
     return false;
   } catch (error) {
-    console.error('Error requesting notification permission:', error);
+    logger.error('Error requesting notification permission:', error);
     return false;
   }
 }
@@ -90,18 +111,23 @@ async function registerTokenOnServer(token: string): Promise<void> {
     });
     
     if (response.ok) {
-      console.log('FCM token registered on server');
+      logger.info('FCM token registered on server');
       localStorage.setItem('fcmToken', token);
     }
   } catch (error) {
-    console.error('Failed to register token on server:', error);
+    logger.error('Failed to register token on server:', error);
   }
 }
 
 // 포그라운드 메시지 리스너 설정
 export function setupForegroundMessageListener(): void {
+  if (!messaging) {
+    logger.warn('Firebase messaging not initialized. Cannot setup foreground message listener.');
+    return;
+  }
+  
   onMessage(messaging, (payload) => {
-    console.log('Message received in foreground:', payload);
+    logger.debug('Message received in foreground:', payload);
     
     const { title, body, icon, data } = payload.notification || {};
     
@@ -190,23 +216,44 @@ export function showInAppNotification(options: NotificationOptions): void {
     gap: 12px;
   `;
   
-  notification.innerHTML = `
-    ${icon ? `<img src="${icon}" alt="" style="width: 24px; height: 24px; flex-shrink: 0;">` : ''}
-    <div style="flex: 1; min-width: 0;">
-      <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${title}</div>
-      <div style="font-size: 12px; opacity: 0.9; line-height: 1.3;">${body}</div>
-    </div>
-    <button style="
-      background: none;
-      border: none;
-      color: white;
-      font-size: 18px;
-      cursor: pointer;
-      padding: 0;
-      line-height: 1;
-      opacity: 0.7;
-    " onclick="this.parentElement.remove()">×</button>
+  // Create notification content safely using DOM methods instead of innerHTML
+  if (icon) {
+    const iconImg = document.createElement('img');
+    iconImg.src = icon;
+    iconImg.alt = '';
+    iconImg.style.cssText = 'width: 24px; height: 24px; flex-shrink: 0;';
+    notification.appendChild(iconImg);
+  }
+  
+  const contentDiv = document.createElement('div');
+  contentDiv.style.cssText = 'flex: 1; min-width: 0;';
+  
+  const titleDiv = document.createElement('div');
+  titleDiv.style.cssText = 'font-weight: bold; font-size: 14px; margin-bottom: 4px;';
+  titleDiv.textContent = title; // Use textContent instead of innerHTML to prevent XSS
+  
+  const bodyDiv = document.createElement('div');
+  bodyDiv.style.cssText = 'font-size: 12px; opacity: 0.9; line-height: 1.3;';
+  bodyDiv.textContent = body; // Use textContent instead of innerHTML to prevent XSS
+  
+  contentDiv.appendChild(titleDiv);
+  contentDiv.appendChild(bodyDiv);
+  notification.appendChild(contentDiv);
+  
+  const closeButton = document.createElement('button');
+  closeButton.style.cssText = `
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    opacity: 0.7;
   `;
+  closeButton.textContent = '×';
+  closeButton.addEventListener('click', () => notification.remove());
+  notification.appendChild(closeButton);
   
   // 클릭 이벤트
   notification.addEventListener('click', (e) => {
@@ -330,7 +377,7 @@ export async function initializePushNotifications(): Promise<boolean> {
     
     return true;
   } catch (error) {
-    console.error('Failed to initialize push notifications:', error);
+    logger.error('Failed to initialize push notifications:', error);
     return false;
   }
 }
@@ -354,7 +401,7 @@ export async function unsubscribeFromPushNotifications(): Promise<void> {
       localStorage.removeItem('fcmToken');
     }
   } catch (error) {
-    console.error('Failed to unsubscribe from push notifications:', error);
+    logger.error('Failed to unsubscribe from push notifications:', error);
   }
 }
 

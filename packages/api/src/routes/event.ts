@@ -88,7 +88,14 @@ const eventCreateSchema = z.object({
   path: ['endDate']
 });
 
-const eventUpdateSchema = eventCreateSchema.partial();
+const eventUpdateSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200, 'Title cannot exceed 200 characters').optional(),
+  description: z.string().optional(),
+  eventType: z.enum(['signup_bonus', 'referral_bonus', 'special_coupon']).optional(),
+  bonusAmount: z.number().min(0, 'Bonus amount must be non-negative').optional(),
+  startDate: z.string().datetime('Invalid start date').optional(),
+  endDate: z.string().datetime('Invalid end date').optional()
+});
 
 /**
  * @swagger

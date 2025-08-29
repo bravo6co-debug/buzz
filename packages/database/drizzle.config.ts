@@ -8,7 +8,13 @@ export default defineConfig({
   out: './migrations',
   driver: 'pg',
   dbCredentials: {
-    connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/buzz_platform',
+    connectionString: (() => {
+      const dbUrl = process.env.DATABASE_URL;
+      if (!dbUrl) {
+        throw new Error('DATABASE_URL environment variable is required for migrations');
+      }
+      return dbUrl;
+    })(),
   },
   verbose: true,
   strict: true,
